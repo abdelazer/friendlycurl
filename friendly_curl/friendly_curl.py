@@ -1,10 +1,21 @@
+__all__ = ['FriendlyCURL', 'url_parameters']
+
 import logging
 import os
 
 import pycurl
-from cStringIO import StringIO 
+from cStringIO import StringIO
+
+import urllib
 
 log = logging.getLogger(__name__)
+
+def url_parameters(base_url, **kwargs):
+    """Uses any extra keyword arguments to create a "query string" and
+    append it to base_url."""
+    if kwargs:
+        base_url += '?' + urllib.urlencode(kwargs, doseq=True)
+    return base_url
 
 class FriendlyCURL(object):
     """Friendly wrapper for a PyCURL Handle object."""
@@ -27,9 +38,9 @@ class FriendlyCURL(object):
                                                     header, value in
                                                     request_headers.iteritems()])
         self.curl_handle.setopt(pycurl.URL, url)
-        body = cStringIO()
+        body = StringIO()
         self.curl_handle.setopt(pycurl.WRITEFUNCTION, body.write)
-        header = cStringIO()
+        header = StringIO()
         self.curl_handle.setopt(pycurl.HEADERFUNCTION, header.write)
         self.curl_handle.perform()
         self.curl_handle.setopt(pycurl.HTTPHEADER, [])
@@ -60,7 +71,9 @@ class FriendlyCURL(object):
         POSTs data of content_type to a URL using pycurl. Returns a tuple
         containing a response object (httplib-style) and the content as a buffer.
         
-        Can also provide a file to upload and the length of that file.
+        Can also provide a file to upload and the length of that file. If
+        length is not determined, friendly_curl will try to use os.fstat to
+        find it.
         
         Can optionally provide additional headers as a dictionary.
         """
@@ -85,7 +98,9 @@ class FriendlyCURL(object):
         PUTs data of content_type to a URL using pycurl. Returns a tuple
         containing a response object (httplib-style) and the content as a buffer.
         
-        Can also provide a file to upload and the length of that file.
+        Can also provide a file to upload and the length of that file. If
+        length is not determined, friendly_curl will try to use os.fstat to
+        find it.
         
         Can optionally provide additional headers as a dictionary.
         """
