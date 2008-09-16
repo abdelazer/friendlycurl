@@ -28,6 +28,7 @@ class FriendlyCURL(object):
         """
         self.curl_handle = pycurl.Curl()
         if accept_self_signed_SSL == True:
+            self.accept_self_signed_SSL = accept_self_signed_SSL
             self.curl_handle.setopt(pycurl.SSL_VERIFYPEER, 0)
     
     def _common_perform(self, url, request_headers):
@@ -142,3 +143,5 @@ class FriendlyCURL(object):
             self.curl_handle.reset()
         else:
             self.curl_handle = pycurl.Curl()
+        if self.accept_self_signed_SSL:
+            self.curl_handle.setopt(pycurl.SSL_VERIFYPEER, 0)
