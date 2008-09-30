@@ -2,6 +2,10 @@ __all__ = ['FriendlyCURL', 'url_parameters']
 
 import logging
 import os
+try:
+    import threading as _threading
+except ImportError:
+    import dummy_threading as _threading
 
 import pycurl
 from cStringIO import StringIO
@@ -144,4 +148,12 @@ class FriendlyCURL(object):
         else:
             self.curl_handle = pycurl.Curl()
         if self.accept_self_signed_SSL:
-            self.curl_handle.setopt(pycurl.SSL_VERIFYPEER, 0)
+            self.curl_handle.setopt(pycurl.SSL_VERIFYPEER, 0)            
+            
+local = _threading.local()
+    
+def threadCURLSingleton(*args, **kwargs):
+    """Returns a CURL object that is a singleton per thread."""
+    if not hasattr(local, 'fcurl'):
+        local.fcurl = FriendlyCURL(*args, **kwargs)
+    return local.fcurl

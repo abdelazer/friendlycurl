@@ -288,3 +288,20 @@ class TestFriendlyCURL(unittest.TestCase):
         resp, content = self.fcurl.delete_url('http://127.0.0.1:6110/del_target')
         self.assertEqual(self.request_handler.path, '/del_target',
              'Incorrect path on server.')
+    
+    def testThreadSingleton(self):
+        h1 = friendly_curl.threadCURLSingleton(False)
+        h2 = friendly_curl.threadCURLSingleton(False)
+        self.assert_(h1 is h2)
+        foo = {}
+        def test_thread():
+            foo['h3'] = friendly_curl.threadCURLSingleton(True)
+            foo['h4'] = friendly_curl.threadCURLSingleton(True)
+        thread = threading.Thread(target=test_thread)
+        thread.start()
+        thread.join()
+        self.assert_(foo['h3'] is foo['h4'])
+        self.assert_(h1 is not foo['h3'])
+        self.assert_(h1 is not foo['h4'])
+        self.assert_(h2 is not foo['h3'])
+        self.assert_(h2 is not foo['h4'])
