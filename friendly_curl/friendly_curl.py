@@ -1,4 +1,4 @@
-__all__ = ['FriendlyCURL', 'url_parameters']
+__all__ = ['FriendlyCURL', 'threadCURLSingleton', 'url_parameters']
 
 import logging
 import os
@@ -24,18 +24,16 @@ def url_parameters(base_url, **kwargs):
 class FriendlyCURL(object):
     """Friendly wrapper for a PyCURL Handle object."""
     
-    def __init__(self, accept_self_signed_SSL = False):
+    def __init__(self):
         """
         Creates a friendly CURL object.
         
         accept_self_signed_SSL - Should the object accept self-signed SSL certs?
         """
         self.curl_handle = pycurl.Curl()
-        if accept_self_signed_SSL == True:
-            self.accept_self_signed_SSL = accept_self_signed_SSL
-            self.curl_handle.setopt(pycurl.SSL_VERIFYPEER, 0)
     
-    def _common_perform(self, url, request_headers):
+    def _common_perform(self, url, request_headers,
+                        accept_self_signed_SSL=False, follow_location=True):
         """
         Perform activities common to all FriendlyCURL operations.
         """
@@ -47,8 +45,11 @@ class FriendlyCURL(object):
         self.curl_handle.setopt(pycurl.WRITEFUNCTION, body.write)
         header = StringIO()
         self.curl_handle.setopt(pycurl.HEADERFUNCTION, header.write)
+        if accept_self_signed_SSL == True:
+            self.curl_handle.setopt(pycurl.SSL_VERIFYPEER, 0)
+        if follow_location == True:
+            self.curl_handle.setopt(pycurl.FOLLOWLOCATION, 1)
         self.curl_handle.perform()
-        self.curl_handle.setopt(pycurl.HTTPHEADER, [])
         body.seek(0)
         headers = [hdr.split(': ') for hdr in header.getvalue().strip().split('\r\n') if
                    hdr and not hdr.startswith('HTTP/')]
@@ -57,7 +58,7 @@ class FriendlyCURL(object):
         log.debug("Response object: %r", response)
         return (response, body)
     
-    def get_url(self, url, headers = None):
+    def get_url(self, url, headers = None, **kwargs):
         """
         Fetches a URL using pycurl, returning a tuple containing a response
         object (httplib-style) and the content as a buffer.
@@ -67,11 +68,11 @@ class FriendlyCURL(object):
         headers = headers or {}
         log.debug("CURL GET for %s" % url)
         self.curl_handle.setopt(pycurl.HTTPGET, 1)
-        return self._common_perform(url, headers)
+        return self._common_perform(url, headers, **kwargs)
     
     def post_url(self, url, data=None, upload_file=None, upload_file_length=None,
                  content_type='application/x-www-form-urlencoded',
-                 headers = None):
+                 headers = None, **kwargs):
         """
         POSTs data of content_type to a URL using pycurl. Returns a tuple
         containing a response object (httplib-style) and the content as a buffer.
@@ -92,13 +93,13 @@ class FriendlyCURL(object):
         self.curl_handle.setopt(pycurl.READFUNCTION, upload_file.read)
         headers['Content-Type'] = content_type
         headers['Content-Length'] = upload_file_length
-        result = self._common_perform(url, headers)
+        result = self._common_perform(url, headers, **kwargs)
         self.reset()
         return result
         
     def put_url(self, url, data=None, upload_file=None, upload_file_length=None,
                 content_type='application/x-www-form-urlencoded',
-                headers = None):
+                headers = None, **kwargs):
         """
         PUTs data of content_type to a URL using pycurl. Returns a tuple
         containing a response object (httplib-style) and the content as a buffer.
@@ -119,11 +120,11 @@ class FriendlyCURL(object):
         self.curl_handle.setopt(pycurl.READFUNCTION, upload_file.read)
         headers['Content-Type'] = content_type
         headers['Content-Length'] = upload_file_length
-        result = self._common_perform(url, headers)
+        result = self._common_perform(url, headers, **kwargs)
         self.reset()
         return result
     
-    def delete_url(self, url, headers = None):
+    def delete_url(self, url, headers = None, **kwargs):
         """
         DELETEs a URL using pycurl. Returns a tuple containing a response object
         (httplib-style) and the content as a buffer.
@@ -132,7 +133,7 @@ class FriendlyCURL(object):
         """
         headers = headers or {}
         self.curl_handle.setopt(pycurl.CUSTOMREQUEST, 'DELETE')
-        result = self._common_perform(url, headers)
+        result = self._common_perform(url, headers, **kwargs)
         self.reset()
         return result
     
@@ -147,13 +148,13 @@ class FriendlyCURL(object):
             self.curl_handle.reset()
         else:
             self.curl_handle = pycurl.Curl()
-        if self.accept_self_signed_SSL:
-            self.curl_handle.setopt(pycurl.SSL_VERIFYPEER, 0)            
+        #if self.accept_self_signed_SSL:
+            #self.curl_handle.setopt(pycurl.SSL_VERIFYPEER, 0)            
             
 local = _threading.local()
     
-def threadCURLSingleton(*args, **kwargs):
+def threadCURLSingleton():
     """Returns a CURL object that is a singleton per thread."""
     if not hasattr(local, 'fcurl'):
-        local.fcurl = FriendlyCURL(*args, **kwargs)
+        local.fcurl = FriendlyCURL()
     return local.fcurl

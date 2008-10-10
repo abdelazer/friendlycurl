@@ -12,7 +12,7 @@ import friendly_curl.friendly_curl as friendly_curl
 
 class TestFriendlyCURL(unittest.TestCase):
     def setUp(self):
-        self.fcurl = friendly_curl.FriendlyCURL(True)
+        self.fcurl = friendly_curl.FriendlyCURL()
     
     def testSuccessfulGet(self):
         """Test a basic get request"""
@@ -290,13 +290,13 @@ class TestFriendlyCURL(unittest.TestCase):
              'Incorrect path on server.')
     
     def testThreadSingleton(self):
-        h1 = friendly_curl.threadCURLSingleton(False)
-        h2 = friendly_curl.threadCURLSingleton(False)
+        h1 = friendly_curl.threadCURLSingleton()
+        h2 = friendly_curl.threadCURLSingleton()
         self.assert_(h1 is h2)
         foo = {}
         def test_thread():
-            foo['h3'] = friendly_curl.threadCURLSingleton(True)
-            foo['h4'] = friendly_curl.threadCURLSingleton(True)
+            foo['h3'] = friendly_curl.threadCURLSingleton()
+            foo['h4'] = friendly_curl.threadCURLSingleton()
         thread = threading.Thread(target=test_thread)
         thread.start()
         thread.join()
@@ -305,3 +305,51 @@ class TestFriendlyCURL(unittest.TestCase):
         self.assert_(h1 is not foo['h4'])
         self.assert_(h2 is not foo['h3'])
         self.assert_(h2 is not foo['h4'])
+    
+    def testFollowLocation(self):
+        """Test a basic get request"""
+        self.requests_made = 0
+        class TestRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+            test_object = self
+            
+            def do_GET(self):
+                if self.test_object.requests_made == 0:
+                    self.test_object.first_request_handler = self
+                    self.send_response(302)
+                    self.send_header('Content-Type', 'text/html')
+                    self.send_header('Location', 'http://127.0.0.1:6110/foo.html')
+                    self.end_headers()
+                    self.wfile.write('This is a test redirect.\n')
+                    self.test_object.requests_made = 1
+                elif self.test_object.requests_made == 1:
+                    self.test_object.second_request_handler = self
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'text/html')
+                    self.end_headers()
+                    self.wfile.write('This is a test line.\n')
+                    self.test_object.requests_made = 2
+        
+        def test_thread():
+            server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
+            while self.requests_made != 2:
+                server.handle_request()
+            server.server_close()
+        
+        thread = threading.Thread(target=test_thread)
+        thread.start()
+        
+        # Do this here so test_thread sees it after it drops out of
+        #  handle_request after curl makes its request.
+        resp, content = self.fcurl.get_url('http://127.0.0.1:6110/index.html',
+                                           follow_location=True)
+        self.assertEqual(resp['status'], 200, 'Unexpected HTTP status.')
+        self.assertEqual(resp['content-type'], 'text/html',
+                         'Unexpected Content-Type from server.')
+        self.assertEqual(resp['location'], 'http://127.0.0.1:6110/foo.html',
+                         'Unexpected location from server.')
+        self.assertEqual(content.getvalue(), 'This is a test line.\n',
+                         'Incorrect content returned by server.')
+        self.assertEqual(self.first_request_handler.path, '/index.html',
+                         'Incorrect path on server.')
+        self.assertEqual(self.second_request_handler.path, '/foo.html',
+                         'Incorrect path on server.')
