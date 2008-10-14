@@ -1,4 +1,5 @@
-__all__ = ['FriendlyCURL', 'threadCURLSingleton', 'url_parameters']
+__all__ = ['FriendlyCURL', 'threadCURLSingleton', 'url_parameters',
+           'CurlHTTPConnection', 'CurlHTTPSConnection', 'CurlHTTPResponse']
 
 import logging
 import os
@@ -11,6 +12,9 @@ import pycurl
 from cStringIO import StringIO
 
 import urllib
+import mimetools
+import urlparse
+import httplib
 
 log = logging.getLogger(__name__)
 
@@ -158,3 +162,137 @@ def threadCURLSingleton():
     if not hasattr(local, 'fcurl'):
         local.fcurl = FriendlyCURL()
     return local.fcurl
+
+class CurlHTTPConnection(object):
+    """DuckTyped httplib.HTTPConnection.
+    
+    Does its own thing, rather than using a FriendlyCURL object."""
+    
+    def __init__(self, host, port=None,
+                 key_file=None, cert_file=None, strict=False,
+                 timeout=None, proxy_info=None):
+        self.host = host
+        self.port = port
+        self.key_file = key_file
+        self.cert_file = cert_file
+        self.strict = strict
+        self.timeout = timeout
+        self.proxy_info = proxy_info
+        self.handle = None
+        self.scheme = 'http'
+    
+    def request(self, method, uri, body=None, headers=None):
+        if not self.handle:
+            self.connect()
+        if headers is None:
+            headers = {}
+        if method == 'GET':
+            self.handle.setopt(pycurl.HTTPGET, 1)
+        elif method == 'HEAD':
+            self.handle.setopt(pycurl.NOBODY, 1)
+        elif method == 'POST':
+            self.handle.setopt(pycurl.POST, 1)
+            if body:
+                headers['Content-Length'] = len(body)
+                body_IO = StringIO(body)
+                self.handle.setopt(pycurl.READFUNCTION, body_IO.read)
+        elif method == 'PUT':
+            self.handle.setopt(pycurl.UPLOAD, 1)
+            if body:
+                headers['Content-Length'] = len(body)
+                body_IO = StringIO(body)
+                self.handle.setopt(pycurl.READFUNCTION, body_IO.read)
+        elif body is not None:
+            # Custom method and body provided, error.
+            raise Exception("body not supported with custom method %s." % method)
+        else:
+            # Custom method and no body provided, pretend to do a GET.
+            self.handle.setopt(pycurl.CUSTOMREQUEST, method)
+        if self.port:
+            netloc = '%s:%s' % (self.host, self.port)
+        else:
+            netloc = self.host
+        url = urlparse.urlunparse((self.scheme, netloc, uri, '', '', ''))
+        print url
+        self.handle.setopt(pycurl.URL, url)
+        if headers:
+            self.handle.setopt(pycurl.HTTPHEADER, ['%s: %s' % (header, str(value)) for
+                                                header, value in
+                                                headers.iteritems()])
+        self.handle.setopt(pycurl.SSL_VERIFYPEER, 0)
+        self.handle.setopt(pycurl.NOSIGNAL, 1)
+        if self.key_file:
+            self.handle.setopt(pycurl.SSLKEY, self.key_file)
+        if self.cert_file:
+            self.handle.setopt(pycurl.SSLCERT, self.cert_file)
+        if self.timeout:
+            self.handle.setopt(pycurl.TIMEOUT, self.timeout)
+        # Proxy not supported yet.
+    
+    def getresponse(self):
+        body = StringIO()
+        self.handle.setopt(pycurl.WRITEFUNCTION, body.write)
+        headers = StringIO()
+        self.handle.setopt(pycurl.HEADERFUNCTION, headers.write)
+        self.handle.perform()
+        if hasattr(self.handle, 'reset'):
+            self.handle.reset()
+        else:
+            self.handle = pycurl.Curl()
+        return CurlHTTPResponse(body, headers)
+    
+    def set_debuglevel(self, level):
+        pass
+    
+    def connect(self):
+        self.handle = pycurl.Curl()
+    
+    def close(self):
+        """Also doesn't actually do anything."""
+        self.handle = None
+    
+    def putrequest(self, request, selector, skip_host, skip_accept_encoding):
+        raise NotImplementedError()
+    
+    def putheader(self, header, argument, **kwargs):
+        raise NotImplementedError()
+    
+    def endheaders(self):
+        raise NotImplementedError()
+    
+    def send(self, data):
+        raise NotImplementedError()
+
+class CurlHTTPSConnection(CurlHTTPConnection):
+    def __init__(self, host, port=80,
+             key_file=None, cert_file=None, strict=False,
+             timeout=None, proxy_info=None):
+        super(CurlHTTPSConnection, self).__init__(host, port, key_file,
+                                                  cert_file, strict, timeout,
+                                                  proxy_info)
+        self.scheme = 'https'
+
+class CurlHTTPResponse(httplib.HTTPResponse):
+    def __init__(self, body, headers):
+        self.body = body
+        self.body.seek(0)
+        headers.seek(0)
+        status_line = headers.readline()
+        (http_version, sep, status_line) = status_line.partition(' ')
+        (status, sep, reason) = status_line.partition(' ')
+        self.version = int(''.join(ch for ch in http_version if ch.isdigit()))
+        self.status = int(status)
+        self.reason = reason.strip()
+        self.msg = mimetools.Message(headers)
+    
+    def read(self, amt=-1):
+        return self.body.read(amt)
+    
+    def getheader(self, name, default=None):
+        value = self.msg.get(name)
+        if value is None:
+            return default
+        return value
+    
+    def getheaders(self):
+        return [(header, self.msg.get(header)) for header in self.msg]
