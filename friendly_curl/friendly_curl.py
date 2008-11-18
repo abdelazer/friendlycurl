@@ -59,7 +59,6 @@ class FriendlyCURL(object):
                    hdr and not hdr.startswith('HTTP/')]
         response = dict((header[0].lower(), header[1]) for header in headers)
         response['status'] = self.curl_handle.getinfo(pycurl.HTTP_CODE)
-        log.debug("Response object: %r", response)
         return (response, body)
     
     def get_url(self, url, headers = None, **kwargs):
@@ -70,7 +69,6 @@ class FriendlyCURL(object):
         Can optionally provide additional headers as a dictionary.
         """
         headers = headers or {}
-        log.debug("CURL GET for %s" % url)
         self.curl_handle.setopt(pycurl.HTTPGET, 1)
         return self._common_perform(url, headers, **kwargs)
     
@@ -213,7 +211,7 @@ class CurlHTTPConnection(object):
         else:
             netloc = self.host
         url = urlparse.urlunparse((self.scheme, netloc, uri, '', '', ''))
-        print url
+        self.url = url
         self.handle.setopt(pycurl.URL, url)
         if headers:
             self.handle.setopt(pycurl.HTTPHEADER, ['%s: %s' % (header, str(value)) for
@@ -264,7 +262,7 @@ class CurlHTTPConnection(object):
         raise NotImplementedError()
 
 class CurlHTTPSConnection(CurlHTTPConnection):
-    def __init__(self, host, port=80,
+    def __init__(self, host, port=None,
              key_file=None, cert_file=None, strict=False,
              timeout=None, proxy_info=None):
         super(CurlHTTPSConnection, self).__init__(host, port, key_file,
