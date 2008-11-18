@@ -12,4 +12,5 @@ friendly_curl.egg-info/requires.txt
 friendly_curl.egg-info/top_level.txt
 friendly_curl/tests/__init__.py
 friendly_curl/tests/unit/__init__.py
+friendly_curl/tests/unit/test_curlhttpconnection.py
 friendly_curl/tests/unit/test_friendlycurl.py
