@@ -182,72 +182,73 @@ class CurlHTTPConnection(object):
     def request(self, method, uri, body=None, headers=None):
         if not self.handle:
             self.connect()
+        handle = self.fcurl.curl_handle
         if headers is None:
             headers = {}
+        print method
         if method == 'GET':
-            self.handle.setopt(pycurl.HTTPGET, 1)
+            handle.setopt(pycurl.HTTPGET, 1)
         elif method == 'HEAD':
-            self.handle.setopt(pycurl.NOBODY, 1)
+            handle.setopt(pycurl.NOBODY, 1)
         elif method == 'POST':
-            self.handle.setopt(pycurl.POST, 1)
+            handle.setopt(pycurl.POST, 1)
             if body:
                 headers['Content-Length'] = len(body)
                 body_IO = StringIO(body)
-                self.handle.setopt(pycurl.READFUNCTION, body_IO.read)
+                handle.setopt(pycurl.READFUNCTION, body_IO.read)
         elif method == 'PUT':
-            self.handle.setopt(pycurl.UPLOAD, 1)
+            handle.setopt(pycurl.UPLOAD, 1)
             if body:
                 headers['Content-Length'] = len(body)
                 body_IO = StringIO(body)
-                self.handle.setopt(pycurl.READFUNCTION, body_IO.read)
+                handle.setopt(pycurl.READFUNCTION, body_IO.read)
         elif body is not None:
             # Custom method and body provided, error.
             raise Exception("body not supported with custom method %s." % method)
         else:
             # Custom method and no body provided, pretend to do a GET.
-            self.handle.setopt(pycurl.CUSTOMREQUEST, method)
+            handle.setopt(pycurl.CUSTOMREQUEST, method)
         if self.port:
             netloc = '%s:%s' % (self.host, self.port)
         else:
             netloc = self.host
         url = urlparse.urlunparse((self.scheme, netloc, uri, '', '', ''))
         self.url = url
-        self.handle.setopt(pycurl.URL, url)
+        handle.setopt(pycurl.URL, url)
         if headers:
-            self.handle.setopt(pycurl.HTTPHEADER, ['%s: %s' % (header, str(value)) for
+            handle.setopt(pycurl.HTTPHEADER, ['%s: %s' % (header, str(value)) for
                                                 header, value in
                                                 headers.iteritems()])
-        self.handle.setopt(pycurl.SSL_VERIFYPEER, 0)
-        self.handle.setopt(pycurl.NOSIGNAL, 1)
+        handle.setopt(pycurl.SSL_VERIFYPEER, 0)
+        handle.setopt(pycurl.NOSIGNAL, 1)
         if self.key_file:
-            self.handle.setopt(pycurl.SSLKEY, self.key_file)
+            handle.setopt(pycurl.SSLKEY, self.key_file)
         if self.cert_file:
-            self.handle.setopt(pycurl.SSLCERT, self.cert_file)
+            handle.setopt(pycurl.SSLCERT, self.cert_file)
         if self.timeout:
-            self.handle.setopt(pycurl.TIMEOUT, self.timeout)
+            handle.setopt(pycurl.TIMEOUT, self.timeout)
         # Proxy not supported yet.
     
     def getresponse(self):
+        handle = self.fcurl.curl_handle
         body = StringIO()
-        self.handle.setopt(pycurl.WRITEFUNCTION, body.write)
+        handle.setopt(pycurl.WRITEFUNCTION, body.write)
         headers = StringIO()
-        self.handle.setopt(pycurl.HEADERFUNCTION, headers.write)
-        self.handle.perform()
-        if hasattr(self.handle, 'reset'):
-            self.handle.reset()
-        else:
-            self.handle = pycurl.Curl()
+        handle.setopt(pycurl.HEADERFUNCTION, headers.write)
+        handle.perform()
+        self.fcurl.reset()
         return CurlHTTPResponse(body, headers)
     
     def set_debuglevel(self, level):
         pass
     
     def connect(self):
-        self.handle = pycurl.Curl()
+        self.fcurl = threadCURLSingleton()
+        self.fcurl.reset()
     
     def close(self):
         """Also doesn't actually do anything."""
-        self.handle = None
+        self.fcurl = None
     
     def putrequest(self, request, selector, skip_host, skip_accept_encoding):
         raise NotImplementedError()
