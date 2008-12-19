@@ -10,6 +10,12 @@ import pycurl
 
 import friendly_curl.friendly_curl as friendly_curl
 
+class TestUrlParameters(unittest.TestCase):
+    
+    def testList(self):
+        result = friendly_curl.url_parameters("http://sample", list=[1,2,3])
+        self.assertEqual("http://sample?list=1&list=2&list=3", result)
+
 class TestFriendlyCURL(unittest.TestCase):
     def setUp(self):
         self.fcurl = friendly_curl.FriendlyCURL()

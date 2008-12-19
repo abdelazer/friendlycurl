@@ -18,10 +18,17 @@ import httplib
 
 log = logging.getLogger(__name__)
 
+DEFAULT_URI_ENCODING = 'utf'
+
 def url_parameters(base_url, **kwargs):
     """Uses any extra keyword arguments to create a "query string" and
     append it to base_url."""
     if kwargs:
+        for k, v in kwargs.items():
+            if isinstance(v, list):
+                kwargs[k] = [unicode(e).encode(DEFAULT_URI_ENCODING) for e in v]
+            else:
+                kwargs[k] = unicode(v).encode(DEFAULT_URI_ENCODING)
         base_url += '?' + urllib.urlencode(kwargs, doseq=True)
     return base_url
 
