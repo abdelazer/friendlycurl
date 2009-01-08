@@ -44,7 +44,8 @@ class FriendlyCURL(object):
         self.curl_handle = pycurl.Curl()
     
     def _common_perform(self, url, request_headers,
-                        accept_self_signed_SSL=False, follow_location=True):
+                        accept_self_signed_SSL=False, follow_location=True,
+                        body_buffer = None):
         """
         Perform activities common to all FriendlyCURL operations.
         """
@@ -52,7 +53,10 @@ class FriendlyCURL(object):
                                                     header, value in
                                                     request_headers.iteritems()])
         self.curl_handle.setopt(pycurl.URL, url)
-        body = StringIO()
+        if body_buffer:
+            body = body_buffer
+        else:
+            body = StringIO()
         self.curl_handle.setopt(pycurl.WRITEFUNCTION, body.write)
         header = StringIO()
         self.curl_handle.setopt(pycurl.HEADERFUNCTION, header.write)
@@ -192,7 +196,6 @@ class CurlHTTPConnection(object):
         handle = self.fcurl.curl_handle
         if headers is None:
             headers = {}
-        print method
         if method == 'GET':
             handle.setopt(pycurl.HTTPGET, 1)
         elif method == 'HEAD':
