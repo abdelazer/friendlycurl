@@ -36,11 +36,7 @@ class FriendlyCURL(object):
     """Friendly wrapper for a PyCURL Handle object."""
     
     def __init__(self):
-        """
-        Creates a friendly CURL object.
-        
-        accept_self_signed_SSL - Should the object accept self-signed SSL certs?
-        """
+        """Creates a friendly CURL object."""
         self.curl_handle = pycurl.Curl()
     
     def _common_perform(self, url, request_headers,
