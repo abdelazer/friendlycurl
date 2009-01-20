@@ -26,26 +26,23 @@ class TestFriendlyCURL(unittest.TestCase):
             test_object = self
             
             def do_GET(self):
-                print "Wheeee?"
                 self.test_object.request_handler = self
                 self.send_response(200)
                 self.send_header('Content-Type', 'text/html')
                 self.end_headers()
                 self.wfile.write('This is a test line.\n')
-        
-        runThread = True
+
+        started = threading.Event()
         def test_thread():
             server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-            while runThread:
-                server.handle_request()
+            started.set()
+            server.handle_request()
             server.server_close()
         
         thread = threading.Thread(target=test_thread)
         thread.start()
+        started.wait()
         
-        # Do this here so test_thread sees it after it drops out of
-        #  handle_request after curl makes its request.
-        runThread = False
         resp, content = self.fcurl.get_url('http://127.0.0.1:6110/index.html?foo=bar')
         self.assertEqual(resp['status'], 200, 'Unexpected HTTP status.')
         self.assertEqual(resp['content-type'], 'text/html',
@@ -54,6 +51,7 @@ class TestFriendlyCURL(unittest.TestCase):
                          'Incorrect content returned by server.')
         self.assertEqual(self.request_handler.path, '/index.html?foo=bar',
                          'Incorrect path on server.')
+        thread.join()
             
     def testSuccessfulGetWithHeaders(self):
         """Test a basic get request with headers"""
@@ -67,24 +65,23 @@ class TestFriendlyCURL(unittest.TestCase):
                 self.end_headers()
                 self.wfile.write('This is a test line.\n')
         
-        runThread = True
+        started = threading.Event()
         def test_thread():
             server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-            while runThread:
-                server.handle_request()
+            started.set()
+            server.handle_request()
             server.server_close()
         
         thread = threading.Thread(target=test_thread)
         thread.start()
+        started.wait()
         
-        # Do this here so test_thread sees it after it drops out of
-        #  handle_request after curl makes its request.
-        runThread = False
         resp, content = self.fcurl.get_url('http://127.0.0.1:6110/index.html?foo=bar',
                                            {'SHAZAM': 'Marvellous'})
         self.assertEqual(self.request_handler.headers['SHAZAM'], 'Marvellous',
                          'Test request header not found on server.')
-    
+        thread.join()
+
     def testErrorGet(self):
         """Test a get request that causes an error"""
         class TestRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -94,19 +91,17 @@ class TestFriendlyCURL(unittest.TestCase):
                 self.test_object.request_handler = self
                 self.send_error(404)
         
-        runThread = True
+        started = threading.Event()
         def test_thread():
             server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-            while runThread:
-                server.handle_request()
+            started.set()
+            server.handle_request()
             server.server_close()
         
         thread = threading.Thread(target=test_thread)
         thread.start()
+        started.wait()
         
-        # Do this here so test_thread sees it after it drops out of
-        #  handle_request after curl makes its request.
-        runThread = False
         resp, content = self.fcurl.get_url('http://127.0.0.1:6110/index.html?foo=bar')
         self.assertEqual(resp['status'], 404, 'Unexpected HTTP status.')
         self.assertEqual(resp['content-type'], 'text/html',
@@ -115,6 +110,7 @@ class TestFriendlyCURL(unittest.TestCase):
                      'Unexpected error document from server.')
         self.assertEqual(self.request_handler.path, '/index.html?foo=bar',
                          'Incorrect path on server.')
+        thread.join()
     
     def testPostData(self):
         """Test a basic post request"""
@@ -130,19 +126,17 @@ class TestFriendlyCURL(unittest.TestCase):
                 self.end_headers()
                 self.wfile.write('This is a test line.\n')
         
-        runThread = True
+        started = threading.Event()
         def test_thread():
             server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-            while runThread:
-                server.handle_request()
+            started.set()
+            server.handle_request()
             server.server_close()
         
         thread = threading.Thread(target=test_thread)
         thread.start()
+        started.wait()
         
-        # Do this here so test_thread sees it after it drops out of
-        #  handle_request after curl makes its request.
-        runThread = False
         resp, content = self.fcurl.post_url('http://127.0.0.1:6110/post_target',
                                             data='foo=bar&baz=garply\r\n')
         self.assertEqual(self.request_handler.headers['content-length'], '20')
@@ -150,6 +144,7 @@ class TestFriendlyCURL(unittest.TestCase):
                          'Incorrect data on server.')
         self.assertEqual(self.request_handler.path, '/post_target',
                  'Incorrect path on server.')
+        thread.join()
     
     def testPostTempFile(self):
         """Test a post request using a TempFile"""
@@ -165,19 +160,17 @@ class TestFriendlyCURL(unittest.TestCase):
                 self.end_headers()
                 self.wfile.write('This is a test line.\n')
         
-        runThread = True
+        started = threading.Event()
         def test_thread():
             server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-            while runThread:
-                server.handle_request()
+            started.set()
+            server.handle_request()
             server.server_close()
         
         thread = threading.Thread(target=test_thread)
         thread.start()
+        started.wait()
         
-        # Do this here so test_thread sees it after it drops out of
-        #  handle_request after curl makes its request.
-        runThread = False
         test_file = tempfile.TemporaryFile()
         test_file.write('foo=bar&baz=garply\r\n')
         test_file.flush()
@@ -188,6 +181,7 @@ class TestFriendlyCURL(unittest.TestCase):
         self.assertEqual(self.post_content, 'foo=bar&baz=garply\r\n')
         self.assertEqual(self.request_handler.path, '/post_target',
                  'Incorrect path on server.')
+        thread.join()
     
     def testPutData(self):
         """Test a basic put request"""
@@ -205,19 +199,17 @@ class TestFriendlyCURL(unittest.TestCase):
                 self.end_headers()
                 self.wfile.write('This is a test line.\n')
         
-        runThread = True
+        started = threading.Event()
         def test_thread():
             server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-            while runThread:
-                server.handle_request()
+            started.set()
+            server.handle_request()
             server.server_close()
         
         thread = threading.Thread(target=test_thread)
         thread.start()
+        started.wait()
         
-        # Do this here so test_thread sees it after it drops out of
-        #  handle_request after curl makes its request.
-        runThread = False
         resp, content = self.fcurl.put_url('http://127.0.0.1:6110/put_target',
                                             data='foo=bar&baz=garply\r\n')
         self.assertEqual(self.request_handler.headers['content-length'], '20')
@@ -225,6 +217,7 @@ class TestFriendlyCURL(unittest.TestCase):
                          'Incorrect data on server.')
         self.assertEqual(self.request_handler.path, '/put_target',
                  'Incorrect path on server.')
+        thread.join()
     
     def testPutTempFile(self):
         """Test a put request using a TempFile"""
@@ -241,19 +234,17 @@ class TestFriendlyCURL(unittest.TestCase):
                 self.end_headers()
                 self.wfile.write('This is a test line.\n')
         
-        runThread = True
+        started = threading.Event()
         def test_thread():
             server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-            while runThread:
-                server.handle_request()
+            started.set()
+            server.handle_request()
             server.server_close()
         
         thread = threading.Thread(target=test_thread)
         thread.start()
+        started.wait()
         
-        # Do this here so test_thread sees it after it drops out of
-        #  handle_request after curl makes its request.
-        runThread = False
         test_file = tempfile.TemporaryFile()
         test_file.write('foo=bar&baz=garply\r\n')
         test_file.flush()
@@ -265,6 +256,7 @@ class TestFriendlyCURL(unittest.TestCase):
                          'Incorrect data on server.')
         self.assertEqual(self.request_handler.path, '/put_target',
              'Incorrect path on server.')
+        thread.join()
     
     def testDelete(self):
         """Test a delete request"""
@@ -278,22 +270,21 @@ class TestFriendlyCURL(unittest.TestCase):
                 self.end_headers()
                 self.wfile.write('This is a test line.\n')
         
-        runThread = True
+        started = threading.Event()
         def test_thread():
             server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-            while runThread:
-                server.handle_request()
+            started.set()
+            server.handle_request()
             server.server_close()
         
         thread = threading.Thread(target=test_thread)
         thread.start()
+        started.wait()
         
-        # Do this here so test_thread sees it after it drops out of
-        #  handle_request after curl makes its request.
-        runThread = False
         resp, content = self.fcurl.delete_url('http://127.0.0.1:6110/del_target')
         self.assertEqual(self.request_handler.path, '/del_target',
              'Incorrect path on server.')
+        thread.join()
     
     def testThreadSingleton(self):
         h1 = friendly_curl.threadCURLSingleton()
@@ -335,14 +326,17 @@ class TestFriendlyCURL(unittest.TestCase):
                     self.wfile.write('This is a test line.\n')
                     self.test_object.requests_made = 2
         
+        started = threading.Event()
         def test_thread():
             server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
+            started.set()
             while self.requests_made != 2:
                 server.handle_request()
             server.server_close()
         
         thread = threading.Thread(target=test_thread)
         thread.start()
+        started.wait()
         
         # Do this here so test_thread sees it after it drops out of
         #  handle_request after curl makes its request.
@@ -359,3 +353,4 @@ class TestFriendlyCURL(unittest.TestCase):
                          'Incorrect path on server.')
         self.assertEqual(self.second_request_handler.path, '/foo.html',
                          'Incorrect path on server.')
+        thread.join()

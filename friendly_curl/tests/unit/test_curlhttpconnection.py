@@ -29,20 +29,18 @@ class TestCurlHTTPConnection(unittest.TestCase):
                 self.send_header('Content-Type', 'text/html')
                 self.end_headers()
                 self.wfile.write('This is a test line.\n')
-        
-        runThread = True
+
+        started = threading.Event()
         def test_thread():
             server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-            while runThread:
-                server.handle_request()
+            started.set()
+            server.handle_request()
             server.server_close()
         
         thread = threading.Thread(target=test_thread)
         thread.start()
+        started.wait()
         
-        # Do this here so test_thread sees it after it drops out of
-        #  handle_request after curl makes its request.
-        runThread = False
         con.request('GET', '/index.html?foo=bar')
         resp = con.getresponse()
         self.assertEqual(resp.status, 200, 'Unexpected HTTP status.')
@@ -52,6 +50,7 @@ class TestCurlHTTPConnection(unittest.TestCase):
                          'Incorrect content returned by server.')
         self.assertEqual(self.request_handler.path, '/index.html?foo=bar',
                          'Incorrect path on server.')
+        thread.join()
             
     def testSuccessfulGetWithHeaders(self):
         """Test a basic get request with headers"""
@@ -66,23 +65,22 @@ class TestCurlHTTPConnection(unittest.TestCase):
                 self.end_headers()
                 self.wfile.write('This is a test line.\n')
         
-        runThread = True
+        started = threading.Event()
         def test_thread():
             server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-            while runThread:
-                server.handle_request()
+            started.set()
+            server.handle_request()
             server.server_close()
         
         thread = threading.Thread(target=test_thread)
         thread.start()
+        started.wait()
         
-        # Do this here so test_thread sees it after it drops out of
-        #  handle_request after curl makes its request.
-        runThread = False
         con.request('GET', '/index.html?foo=bar', headers={'SHAZAM': 'Marvellous'})
         resp = con.getresponse()
         self.assertEqual(self.request_handler.headers['SHAZAM'], 'Marvellous',
                          'Test request header not found on server.')
+        thread.join()
     
     def testErrorGet(self):
         """Test a get request that causes an error"""
@@ -93,20 +91,18 @@ class TestCurlHTTPConnection(unittest.TestCase):
             def do_GET(self):
                 self.test_object.request_handler = self
                 self.send_error(404)
-        
-        runThread = True
+
+        started = threading.Event()
         def test_thread():
             server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-            while runThread:
-                server.handle_request()
+            started.set()
+            server.handle_request()
             server.server_close()
         
         thread = threading.Thread(target=test_thread)
         thread.start()
+        started.wait()
         
-        # Do this here so test_thread sees it after it drops out of
-        #  handle_request after curl makes its request.
-        runThread = False
         con.request('GET', '/index.html?foo=bar')
         resp = con.getresponse()
         self.assertEqual(resp.status, 404, 'Unexpected HTTP status.')
@@ -116,6 +112,7 @@ class TestCurlHTTPConnection(unittest.TestCase):
                      'Unexpected error document from server.')
         self.assertEqual(self.request_handler.path, '/index.html?foo=bar',
                          'Incorrect path on server.')
+        thread.join()
     
     def testPostData(self):
         """Test a basic post request"""
@@ -170,19 +167,17 @@ class TestCurlHTTPConnection(unittest.TestCase):
                 self.end_headers()
                 self.wfile.write('This is a test line.\n')
         
-        runThread = True
+        started = threading.Event()
         def test_thread():
             server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-            while runThread:
-                server.handle_request()
+            started.set()
+            server.handle_request()
             server.server_close()
         
         thread = threading.Thread(target=test_thread)
         thread.start()
+        started.wait()
         
-        # Do this here so test_thread sees it after it drops out of
-        #  handle_request after curl makes its request.
-        runThread = False
         con.request('PUT', '/put_target', body='foo=bar&baz=garply\r\n')
         resp = con.getresponse()
         self.assertEqual(self.request_handler.headers['content-length'], '20')
@@ -190,6 +185,7 @@ class TestCurlHTTPConnection(unittest.TestCase):
                          'Incorrect data on server.')
         self.assertEqual(self.request_handler.path, '/put_target',
                  'Incorrect path on server.')
+        thread.join()
 
     def testDelete(self):
         """Test a delete request"""
@@ -204,23 +200,22 @@ class TestCurlHTTPConnection(unittest.TestCase):
                 self.end_headers()
                 self.wfile.write('This is a test line.\n')
         
-        runThread = True
+        started = threading.Event()
         def test_thread():
             server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-            while runThread:
-                server.handle_request()
+            started.set()
+            server.handle_request()
             server.server_close()
         
         thread = threading.Thread(target=test_thread)
         thread.start()
+        started.wait()
         
-        # Do this here so test_thread sees it after it drops out of
-        #  handle_request after curl makes its request.
-        runThread = False
         con.request('DELETE', '/del_target')
         resp = con.getresponse()
         self.assertEqual(self.request_handler.path, '/del_target',
              'Incorrect path on server.')
+        thread.join()
     
     def testHttpLib2GET(self):
         """Test integration with httplib2 when making a GET request."""
@@ -236,19 +231,17 @@ class TestCurlHTTPConnection(unittest.TestCase):
                     self.end_headers()
                     self.wfile.write('This is a test line.\n')
             
-            runThread = True
+            started = threading.Event()
             def test_thread():
                 server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-                while runThread:
-                    server.handle_request()
+                started.set()
+                server.handle_request()
                 server.server_close()
             
             thread = threading.Thread(target=test_thread)
             thread.start()
+            started.wait()
             
-            # Do this here so test_thread sees it after it drops out of
-            #  handle_request after curl makes its request.
-            runThread = False
             (resp, content) = httpcon.request(
                 uri='http://localhost:6110/index.html?foo=bar',
                 method='GET', connection_type=CurlHTTPConnection)
@@ -259,6 +252,7 @@ class TestCurlHTTPConnection(unittest.TestCase):
                              'Incorrect content returned by server.')
             self.assertEqual(self.request_handler.path, '/index.html?foo=bar',
                              'Incorrect path on server.')
+            thread.join()
     
     def testHttpLib2GETHeaders(self):
         """Test integration with httplib2 by making a get request with headers."""
@@ -274,25 +268,24 @@ class TestCurlHTTPConnection(unittest.TestCase):
                     self.end_headers()
                     self.wfile.write('This is a test line.\n')
             
-            runThread = True
+            started = threading.Event()
             def test_thread():
                 server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-                while runThread:
-                    server.handle_request()
+                started.set()
+                server.handle_request()
                 server.server_close()
             
             thread = threading.Thread(target=test_thread)
             thread.start()
+            started.wait()
             
-            # Do this here so test_thread sees it after it drops out of
-            #  handle_request after curl makes its request.
-            runThread = False
             (resp, content) = httpcon.request(
                 uri='http://127.0.0.1:6110/index.html?foo=bar', method='GET', 
                 headers={'SHAZAM': 'Marvellous'},
                 connection_type=CurlHTTPConnection)
             self.assertEqual(self.request_handler.headers['SHAZAM'], 'Marvellous',
                              'Test request header not found on server.')
+            thread.join()
 
     def testHttpLib2POST(self):
         """Test a post request through httplib2."""
@@ -310,19 +303,17 @@ class TestCurlHTTPConnection(unittest.TestCase):
                     self.end_headers()
                     self.wfile.write('This is a test line.\n')
             
-            runThread = True
+            started = threading.Event()
             def test_thread():
                 server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-                while runThread:
-                    server.handle_request()
+                started.set()
+                server.handle_request()
                 server.server_close()
             
             thread = threading.Thread(target=test_thread)
             thread.start()
+            started.wait()
             
-            # Do this here so test_thread sees it after it drops out of
-            #  handle_request after curl makes its request.
-            runThread = False
             (resp, content) = httpcon.request(
                 uri='http://127.0.0.1:6110/post_target', method='POST',
                 body='foo=bar&baz=garply\r\n', connection_type=CurlHTTPConnection)
@@ -331,6 +322,7 @@ class TestCurlHTTPConnection(unittest.TestCase):
                              'Incorrect data on server.')
             self.assertEqual(self.request_handler.path, '/post_target',
                      'Incorrect path on server.')
+            thread.join()
     
     def testHttpLib2PUT(self):
         """Test a put request through httplib2"""
@@ -350,19 +342,17 @@ class TestCurlHTTPConnection(unittest.TestCase):
                     self.end_headers()
                     self.wfile.write('This is a test line.\n')
             
-            runThread = True
+            started = threading.Event()
             def test_thread():
                 server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-                while runThread:
-                    server.handle_request()
+                started.set()
+                server.handle_request()
                 server.server_close()
             
             thread = threading.Thread(target=test_thread)
             thread.start()
+            started.wait()
             
-            # Do this here so test_thread sees it after it drops out of
-            #  handle_request after curl makes its request.
-            runThread = False
             (resp, content) = httpcon.request(
                 uri='http://127.0.0.1:6110/put_target', method='PUT',
                 body='foo=bar&baz=garply\r\n', connection_type=CurlHTTPConnection)
@@ -371,6 +361,7 @@ class TestCurlHTTPConnection(unittest.TestCase):
                              'Incorrect data on server.')
             self.assertEqual(self.request_handler.path, '/put_target',
                      'Incorrect path on server.')
+            thread.join()
 
     def testHttpLib2DELETE(self):
         """Test a delete request"""
@@ -386,15 +377,16 @@ class TestCurlHTTPConnection(unittest.TestCase):
                     self.end_headers()
                     self.wfile.write('This is a test line.\n')
             
-            runThread = True
+            started = threading.Event()
             def test_thread():
                 server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-                while runThread:
-                    server.handle_request()
+                started.set()
+                server.handle_request()
                 server.server_close()
             
             thread = threading.Thread(target=test_thread)
             thread.start()
+            started.wait()
             
             # Do this here so test_thread sees it after it drops out of
             #  handle_request after curl makes its request.
@@ -404,3 +396,4 @@ class TestCurlHTTPConnection(unittest.TestCase):
                 connection_type=CurlHTTPConnection)
             self.assertEqual(self.request_handler.path, '/del_target',
                  'Incorrect path on server.')
+            thread.join()
