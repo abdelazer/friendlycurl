@@ -78,6 +78,7 @@ class TestFriendlyCURL(unittest.TestCase):
         
         resp, content = self.fcurl.get_url('http://127.0.0.1:6110/index.html?foo=bar',
                                            {'SHAZAM': 'Marvellous'})
+        self.assertEqual(resp['status'], 200)
         self.assertEqual(self.request_handler.headers['SHAZAM'], 'Marvellous',
                          'Test request header not found on server.')
         thread.join()
@@ -139,6 +140,7 @@ class TestFriendlyCURL(unittest.TestCase):
         
         resp, content = self.fcurl.post_url('http://127.0.0.1:6110/post_target',
                                             data='foo=bar&baz=garply\r\n')
+        self.assertEqual(resp['status'], 200)
         self.assertEqual(self.request_handler.headers['content-length'], '20')
         self.assertEqual(self.post_content, 'foo=bar&baz=garply\r\n',
                          'Incorrect data on server.')

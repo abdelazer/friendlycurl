@@ -129,15 +129,16 @@ class TestCurlHTTPConnection(unittest.TestCase):
                 self.end_headers()
                 self.wfile.write('This is a test line.\n')
         
-        runThread = True
+        started = threading.Event()
         def test_thread():
             server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
-            while runThread:
-                server.handle_request()
+            started.set()
+            server.handle_request()
             server.server_close()
         
         thread = threading.Thread(target=test_thread)
         thread.start()
+        started.wait()
         
         # Do this here so test_thread sees it after it drops out of
         #  handle_request after curl makes its request.
@@ -149,6 +150,7 @@ class TestCurlHTTPConnection(unittest.TestCase):
                          'Incorrect data on server.')
         self.assertEqual(self.request_handler.path, '/post_target',
                  'Incorrect path on server.')
+        thread.join()
     
     def testPutData(self):
         """Test a basic put request"""
