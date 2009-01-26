@@ -9,6 +9,7 @@ except ImportError:
     import dummy_threading as _threading
 
 import pycurl
+from pycurl import error as PyCURLError
 from cStringIO import StringIO
 
 import urllib
