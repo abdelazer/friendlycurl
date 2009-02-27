@@ -18,7 +18,7 @@ setup(name='friendly_curl',
       include_package_data=True,
       zip_safe=False,
       install_requires=[
-	"pycurl>=7.16.4",
+	"pycurl>=7.16.4", "httplib2",
           # -*- Extra requirements: -*-
       ],
       entry_points="""

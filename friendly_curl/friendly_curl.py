@@ -13,9 +13,10 @@ from pycurl import error as PyCURLError
 from cStringIO import StringIO
 
 import urllib
-import mimetools
 import urlparse
+import mimetools
 import httplib
+from httplib2 import iri2uri
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +50,8 @@ class FriendlyCURL(object):
         self.curl_handle.setopt(pycurl.HTTPHEADER, ['%s: %s' % (header, str(value)) for
                                                     header, value in
                                                     request_headers.iteritems()])
+        if isinstance(url, unicode):
+            url = str(iri2uri(url))
         self.curl_handle.setopt(pycurl.URL, url)
         if body_buffer:
             body = body_buffer

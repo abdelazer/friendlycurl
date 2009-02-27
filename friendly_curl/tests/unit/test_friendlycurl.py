@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Unit tests for friendly_curl."""
 
 from cStringIO import StringIO
@@ -52,7 +53,40 @@ class TestFriendlyCURL(unittest.TestCase):
         self.assertEqual(self.request_handler.path, '/index.html?foo=bar',
                          'Incorrect path on server.')
         thread.join()
+    
+    def testSuccessfulGetIRI(self):
+        """Test a basic get request with an IRI"""
+        class TestRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+            test_object = self
             
+            def do_GET(self):
+                self.test_object.request_handler = self
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html')
+                self.end_headers()
+                self.wfile.write('This is a test line.\n')
+
+        started = threading.Event()
+        def test_thread():
+            server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
+            started.set()
+            server.handle_request()
+            server.server_close()
+        
+        thread = threading.Thread(target=test_thread)
+        thread.start()
+        started.wait()
+        
+        resp, content = self.fcurl.get_url(u'http://127.0.0.1:6110/ändex.html?foo=bär')
+        self.assertEqual(resp['status'], 200, 'Unexpected HTTP status.')
+        self.assertEqual(resp['content-type'], 'text/html',
+                         'Unexpected Content-Type from server.')
+        self.assertEqual(content.getvalue(), 'This is a test line.\n',
+                         'Incorrect content returned by server.')
+        self.assertEqual(self.request_handler.path, '/%C3%A4ndex.html?foo=b%C3%A4r',
+                         'Incorrect path on server.')
+        thread.join()
+    
     def testSuccessfulGetWithHeaders(self):
         """Test a basic get request with headers"""
         class TestRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
