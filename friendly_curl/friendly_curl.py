@@ -83,6 +83,17 @@ class FriendlyCURL(object):
         self.curl_handle.setopt(pycurl.HTTPGET, 1)
         return self._common_perform(url, headers, **kwargs)
     
+    def head_url(self, url, headers = None, **kwargs):
+        """
+        Fetches a URL's headers using pycurl, returning a tuple containing a
+        response object (httplib-style) and the content as a buffer.
+        
+        Can optionally provide additional headers as a dictionary.
+        """
+        headers = headers or {}
+        self.curl_handle.setopt(pycurl.NOBODY, 1)
+        return self._common_perform(url, headers, **kwargs)
+    
     def post_url(self, url, data=None, upload_file=None, upload_file_length=None,
                  content_type='application/x-www-form-urlencoded',
                  headers = None, **kwargs):

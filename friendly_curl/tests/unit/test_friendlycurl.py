@@ -322,6 +322,37 @@ class TestFriendlyCURL(unittest.TestCase):
              'Incorrect path on server.')
         thread.join()
     
+    def testSuccessfulHead(self):
+        """Test a basic HEAD request"""
+        class TestRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+            test_object = self
+            
+            def do_HEAD(self):
+                self.test_object.request_handler = self
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html')
+                self.end_headers()
+
+        started = threading.Event()
+        def test_thread():
+            server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
+            started.set()
+            server.handle_request()
+            server.server_close()
+        
+        thread = threading.Thread(target=test_thread)
+        thread.start()
+        started.wait()
+        
+        resp, content = self.fcurl.head_url('http://127.0.0.1:6110/index.html?foo=bar')
+        self.assertEqual(resp['status'], 200, 'Unexpected HTTP status.')
+        self.assertEqual(resp['content-type'], 'text/html',
+                         'Unexpected Content-Type from server.')
+        self.assertEqual(content.getvalue(), '')
+        self.assertEqual(self.request_handler.path, '/index.html?foo=bar',
+                         'Incorrect path on server.')
+        thread.join()
+    
     def testThreadSingleton(self):
         h1 = friendly_curl.threadCURLSingleton()
         h2 = friendly_curl.threadCURLSingleton()
