@@ -34,6 +34,19 @@ def url_parameters(base_url, **kwargs):
         base_url += '?' + urllib.urlencode(kwargs, doseq=True)
     return base_url
 
+def debugfunction(curl_info, data):
+    if curl_info == pycurl.INFOTYPE_TEXT:
+        log.debug("Info: %r", data)
+    elif curl_info == pycurl.INFOTYPE_HEADER_IN:
+        log.debug("Header From Peer: %r", data)
+    elif curl_info == pycurl.INFOTYPE_HEADER_OUT:
+        log.debug("Header Sent to Peer: %r", data)
+    elif curl_info == pycurl.INFOTYPE_DATA_IN:
+        log.debug("Data From Peer: %r", data)
+    elif curl_info == pycurl.INFOTYPE_DATA_OUT:
+        log.debug("Data To Peer: %r", data)
+    return 0
+
 class FriendlyCURL(object):
     """Friendly wrapper for a PyCURL Handle object."""
     
@@ -43,7 +56,7 @@ class FriendlyCURL(object):
     
     def _common_perform(self, url, request_headers,
                         accept_self_signed_SSL=False, follow_location=True,
-                        body_buffer = None):
+                        body_buffer=None, debug=False):
         """
         Perform activities common to all FriendlyCURL operations.
         """
@@ -64,6 +77,9 @@ class FriendlyCURL(object):
             self.curl_handle.setopt(pycurl.SSL_VERIFYPEER, 0)
         if follow_location == True:
             self.curl_handle.setopt(pycurl.FOLLOWLOCATION, 1)
+        if debug:
+            self.curl_handle.setopt(pycurl.VERBOSE, 1)
+            self.curl_handle.setopt(pycurl.DEBUGFUNCTION, debugfunction)
         self.curl_handle.perform()
         body.seek(0)
         headers = [hdr.split(': ') for hdr in header.getvalue().strip().split('\r\n') if
@@ -92,7 +108,9 @@ class FriendlyCURL(object):
         """
         headers = headers or {}
         self.curl_handle.setopt(pycurl.NOBODY, 1)
-        return self._common_perform(url, headers, **kwargs)
+        result = self._common_perform(url, headers, **kwargs)
+        self.reset()
+        return result
     
     def post_url(self, url, data=None, upload_file=None, upload_file_length=None,
                  content_type='application/x-www-form-urlencoded',
