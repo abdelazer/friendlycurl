@@ -399,3 +399,39 @@ class TestCurlHTTPConnection(unittest.TestCase):
             self.assertEqual(self.request_handler.path, '/del_target',
                  'Incorrect path on server.')
             thread.join()
+    
+    def testSuccessfulGetWithUnicodeUri(self):
+        """Test a basic get request with a unicode object passed to con.request."""
+        con = CurlHTTPConnection('127.0.0.1', 6110)
+        class TestRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+            test_object = self
+            
+            def do_GET(self):
+                self.test_object.request_handler = self
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html')
+                self.end_headers()
+                self.wfile.write('This is a test line.\n')
+
+        started = threading.Event()
+        def test_thread():
+            server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
+            started.set()
+            server.handle_request()
+            server.server_close()
+        
+        thread = threading.Thread(target=test_thread)
+        thread.start()
+        started.wait()
+        
+        con.request('GET', u'/index.html?foo=bar')
+        resp = con.getresponse()
+        self.assertEqual(resp.status, 200, 'Unexpected HTTP status.')
+        self.assertEqual(resp.getheader('content-type'), 'text/html',
+                         'Unexpected Content-Type from server.')
+        self.assertEqual(resp.read(), 'This is a test line.\n',
+                         'Incorrect content returned by server.')
+        self.assertEqual(self.request_handler.path, '/index.html?foo=bar',
+                         'Incorrect path on server.')
+        thread.join()
+            
