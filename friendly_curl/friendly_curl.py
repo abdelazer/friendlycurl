@@ -254,7 +254,7 @@ class CurlHTTPConnection(object):
         else:
             netloc = self.host
         url = urlparse.urlunparse((self.scheme, netloc, uri, '', '', ''))
-        self.url = iri2uri(url)
+        self.url = str(iri2uri(url))
         handle.setopt(pycurl.URL, self.url)
         if headers:
             handle.setopt(pycurl.HTTPHEADER, ['%s: %s' % (header, str(value)) for
