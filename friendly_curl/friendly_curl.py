@@ -1,5 +1,5 @@
 __all__ = ['FriendlyCURL', 'threadCURLSingleton', 'url_parameters',
-           'CurlHTTPConnection', 'CurlHTTPSConnection', 'CurlHTTPResponse']
+           'CurlHTTPConnection', 'CurlHTTPSConnection', 'CurlHTTPResponse',]
 
 import logging
 import os
@@ -19,6 +19,8 @@ import httplib
 from httplib2 import iri2uri
 
 log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
+log.addHandler(logging.StreamHandler())
 
 DEFAULT_URI_ENCODING = 'utf'
 
@@ -252,8 +254,8 @@ class CurlHTTPConnection(object):
         else:
             netloc = self.host
         url = urlparse.urlunparse((self.scheme, netloc, uri, '', '', ''))
-        self.url = url
-        handle.setopt(pycurl.URL, url)
+        self.url = iri2uri(url)
+        handle.setopt(pycurl.URL, self.url)
         if headers:
             handle.setopt(pycurl.HTTPHEADER, ['%s: %s' % (header, str(value)) for
                                                 header, value in
