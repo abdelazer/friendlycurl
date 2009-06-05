@@ -53,18 +53,36 @@ class FriendlyCURL(object):
     """Friendly wrapper for a PyCURL Handle object."""
     
     def __init__(self):
-        """Creates a friendly CURL object."""
         self.curl_handle = pycurl.Curl()
     
-    def _common_perform(self, url, request_headers,
-                        accept_self_signed_SSL=False, follow_location=True,
+    def _common_perform(self, url, headers,
+                        accept_self_signed_SSL=False,
+                        follow_location=True,
                         body_buffer=None, debug=False):
-        """
-        Perform activities common to all FriendlyCURL operations.
-        """
-        self.curl_handle.setopt(pycurl.HTTPHEADER, ['%s: %s' % (header, str(value)) for
-                                                    header, value in
-                                                    request_headers.iteritems()])
+        """Perform activities common to all FriendlyCURL operations. Several
+        parameters are passed through and processed identically for all of the
+        \*_url functions, and all produce the same return type.
+        
+        :param url: The URL to access. If a unicode string, it will be treated\
+        as an IRI and converted to a URI.
+        :type url: str or unicode
+        :param headers: Additional headers to add to the request.
+        :type headers: dict
+        :param accept_self_signed_SSL: Whether to accept self-signed SSL certs.
+        :type accept_self_signed_SSL: bool
+        :param follow_location: If True, FriendlyCURL will follow location\
+        headers on HTTP redirects. If False, the redirect will be returned.
+        :type follow_location: bool
+        :param body_buffer: A buffer to write body content into.
+        :type body_buffer: ``.write(str)``-able file-like object
+        :param debug: Turn on debug logging for this request.
+        :type debug: bool
+        :returns: A tuple containing a dictionary of response headers, including\
+        the HTTP status as an int in 'status' and a buffer containing the body\
+        of the response."""
+        self.curl_handle.setopt(
+            pycurl.HTTPHEADER,
+            ['%s: %s' % (header, str(value)) for header, value in headers.iteritems()])
         if isinstance(url, unicode):
             url = str(iri2uri(url))
         self.curl_handle.setopt(pycurl.URL, url)
@@ -91,23 +109,15 @@ class FriendlyCURL(object):
         return (response, body)
     
     def get_url(self, url, headers = None, **kwargs):
-        """
-        Fetches a URL using pycurl, returning a tuple containing a response
-        object (httplib-style) and the content as a buffer.
-        
-        Can optionally provide additional headers as a dictionary.
-        """
+        """Perform a regular HTTP GET using pycurl. See :meth:`_common_perform`
+        for details."""
         headers = headers or {}
         self.curl_handle.setopt(pycurl.HTTPGET, 1)
         return self._common_perform(url, headers, **kwargs)
     
     def head_url(self, url, headers = None, **kwargs):
-        """
-        Fetches a URL's headers using pycurl, returning a tuple containing a
-        response object (httplib-style) and the content as a buffer.
-        
-        Can optionally provide additional headers as a dictionary.
-        """
+        """Performs an HTTP HEAD using pycurl. See :meth:`_common_perform`
+        for details."""
         headers = headers or {}
         self.curl_handle.setopt(pycurl.NOBODY, 1)
         result = self._common_perform(url, headers, **kwargs)
@@ -117,16 +127,19 @@ class FriendlyCURL(object):
     def post_url(self, url, data=None, upload_file=None, upload_file_length=None,
                  content_type='application/x-www-form-urlencoded',
                  headers = None, **kwargs):
-        """
-        POSTs data of content_type to a URL using pycurl. Returns a tuple
-        containing a response object (httplib-style) and the content as a buffer.
+        """Performs an HTTP POST using pycurl. If ``headers`` is provided, it
+        will have Content-Type and Content-Length added to it.  See
+        :meth:`_common_perform` for further details.
         
-        Can also provide a file to upload and the length of that file. If
-        length is not determined, friendly_curl will try to use os.fstat to
-        find it.
-        
-        Can optionally provide additional headers as a dictionary.
-        """
+        :param data: The data to use as the POST body. Will over-ride\
+        ``upload_file`` and ``upload_file_length`` if provided.
+        :type data: str or unicode
+        :param upload_file: The data to use as the POST body.
+        :type upload_file: ``.read()``-able file-like object
+        :param upload_file_length: The length of ``upload_file``. If\
+        ``upload_file`` is provided and this is not, ``friendly_curl`` will use\
+        ``os.fstat`` to calculate it.
+        :param content_type: The type of the data being POSTed."""
         headers = headers or {}
         self.curl_handle.setopt(pycurl.POST, 1)
         if data:
@@ -144,16 +157,8 @@ class FriendlyCURL(object):
     def put_url(self, url, data=None, upload_file=None, upload_file_length=None,
                 content_type='application/x-www-form-urlencoded',
                 headers = None, **kwargs):
-        """
-        PUTs data of content_type to a URL using pycurl. Returns a tuple
-        containing a response object (httplib-style) and the content as a buffer.
-        
-        Can also provide a file to upload and the length of that file. If
-        length is not determined, friendly_curl will try to use os.fstat to
-        find it.
-        
-        Can optionally provide additional headers as a dictionary.
-        """
+        """Perform an HTTP PUT using pycurl. See :meth:`post_url` and
+        :meth:`_common_perform` for further details."""
         headers = headers or {}
         self.curl_handle.setopt(pycurl.UPLOAD, 1)
         if data:
@@ -169,12 +174,8 @@ class FriendlyCURL(object):
         return result
     
     def delete_url(self, url, headers = None, **kwargs):
-        """
-        DELETEs a URL using pycurl. Returns a tuple containing a response object
-        (httplib-style) and the content as a buffer.
-        
-        Can optionally provide additional headers as a dictionary.
-        """
+        """Perform an HTTP DELETE using pycurl. See :meth:`_common_perform` for
+        further details."""
         headers = headers or {}
         self.curl_handle.setopt(pycurl.CUSTOMREQUEST, 'DELETE')
         result = self._common_perform(url, headers, **kwargs)
@@ -182,23 +183,21 @@ class FriendlyCURL(object):
         return result
     
     def reset(self):
-        """
-        Resets the CURL handle after a put, post, or delete.
+        """Resets the CURL handle to its base state. Automatically called after
+        a HEAD, POST, PUT, or DELETE.
         
-        If reset is available, it uses that to maintain the handle's connection
-        pool. Otherwise, it replaces the handle.
-        """
+        Will use the pycurl handle's ``reset()`` method if available. Otherwise
+        discards and replaces the pycurl handle."""
         if hasattr(self.curl_handle, 'reset'):
             self.curl_handle.reset()
         else:
             self.curl_handle = pycurl.Curl()
-        #if self.accept_self_signed_SSL:
-            #self.curl_handle.setopt(pycurl.SSL_VERIFYPEER, 0)            
             
 local = _threading.local()
     
 def threadCURLSingleton():
-    """Returns a CURL object that is a singleton per thread."""
+    """Creates or returns a single :class:`FriendlyCURL` object per thread. You
+    will usually want to call this to obtain a :class:`FriendlyCURL` object."""
     if not hasattr(local, 'fcurl'):
         local.fcurl = FriendlyCURL()
     return local.fcurl
