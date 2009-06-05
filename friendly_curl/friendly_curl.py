@@ -50,7 +50,8 @@ def debugfunction(curl_info, data):
     return 0
 
 class FriendlyCURL(object):
-    """Friendly wrapper for a PyCURL Handle object."""
+    """Friendly wrapper for a PyCURL Handle object. You probably don't want to
+    instantiate this yourself. Instead, use :func:`threadCURLSingleton`."""
     
     def __init__(self):
         self.curl_handle = pycurl.Curl()
@@ -203,9 +204,13 @@ def threadCURLSingleton():
     return local.fcurl
 
 class CurlHTTPConnection(object):
-    """DuckTyped httplib.HTTPConnection.
+    """A HTTPConncetion-style object that uses pycurl to actually do the work.
     
-    Does its own thing, rather than using a FriendlyCURL object."""
+    Intended for use with httplib2. To use, import friendly_curl and httplib2
+    and monkey-patch httplib2 as follows::
+    
+        httplib2.HTTPConnectionWithTimeout = CurlHTTPConnection
+        httplib2.HTTPSConnectionWithTimeout = CurlHTTPSConnection"""
     
     def __init__(self, host, port=None,
                  key_file=None, cert_file=None, strict=False,
@@ -303,6 +308,9 @@ class CurlHTTPConnection(object):
         raise NotImplementedError()
 
 class CurlHTTPSConnection(CurlHTTPConnection):
+    """Like :class:`CurlHTTPConnection`, but uses https rather than plain http.
+    As with :class:`CurlHTTPConnection`, you probably don't want to use this
+    directly."""
     def __init__(self, host, port=None,
              key_file=None, cert_file=None, strict=False,
              timeout=None, proxy_info=None):
@@ -312,6 +320,8 @@ class CurlHTTPSConnection(CurlHTTPConnection):
         self.scheme = 'https'
 
 class CurlHTTPResponse(httplib.HTTPResponse):
+    """Used by :class:`CurlHTTPConnection` and :class:`CurlHTTPSConnection` to
+    return the HTTP response."""
     def __init__(self, body, headers):
         self.body = body
         self.body.seek(0)
@@ -325,13 +335,19 @@ class CurlHTTPResponse(httplib.HTTPResponse):
         self.msg = mimetools.Message(headers)
     
     def read(self, amt=-1):
+        """Read data from the body of the HTTP response."""
         return self.body.read(amt)
     
     def getheader(self, name, default=None):
+        """Get a header from the HTTP response.
+        
+        :param default: The value to return if the header is not present.\
+        Defaults to ``None``."""
         value = self.msg.get(name)
         if value is None:
             return default
         return value
     
     def getheaders(self):
+        """Get a dictionary of all HTTP response headers."""
         return [(header, self.msg.get(header)) for header in self.msg]
