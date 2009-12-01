@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """Unit tests for friendly_curl."""
 
-from cStringIO import StringIO
-import unittest
 import BaseHTTPServer
-import threading
+from cStringIO import StringIO
+import os
 import tempfile
+import threading
+import unittest
 
 import pycurl
 
@@ -20,6 +21,16 @@ class TestUrlParameters(unittest.TestCase):
 class TestFriendlyCURL(unittest.TestCase):
     def setUp(self):
         self.fcurl = friendly_curl.FriendlyCURL()
+        
+    def tearDown(self):
+        try:
+            os.unlink(os.path.join(self.fcurl.cache_dir, '%s.response' % hash('http://127.0.0.1:6110/index.html')))
+        except:
+            pass
+        try:
+            os.unlink(os.path.join(self.fcurl.cache_dir, '%s.body' % hash('http://127.0.0.1:6110/index.html')))
+        except:
+            pass
     
     def testSuccessfulGet(self):
         """Test a basic get request"""
@@ -423,14 +434,13 @@ class TestFriendlyCURL(unittest.TestCase):
         thread.join()
     
     def testCachedGet(self):
-        """Test a basic get request"""
+        """Test a basic get request whose result has been cached"""
+        self.num_handled = 0
         class TestRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             test_object = self
             
-            num_handled = 0
-            
             def do_GET(self):
-                if self.num_handled == 0:
+                if self.test_object.num_handled == 0:
                     self.test_object.request_handler = self
                     self.send_response(200)
                     self.send_header('Content-Type', 'text/html')
@@ -438,13 +448,13 @@ class TestFriendlyCURL(unittest.TestCase):
                     self.send_header('ETag', 'notreallyanetag')
                     self.end_headers()
                     self.wfile.write('This is a test line.\n')
-                    self.num_handled += 1
-                elif self.num_handled == 1:
+                    self.test_object.num_handled += 1
+                elif self.test_object.num_handled == 1:
                     self.test_object.request_handler = self
                     self.send_response(304)
                     self.send_header('ETag', 'notreallyanetag')
                     self.end_headers()
-                    self.num_handled += 1
+                    self.test_object.num_handled += 1
         
         started = threading.Event()
         def test_thread():
@@ -474,5 +484,62 @@ class TestFriendlyCURL(unittest.TestCase):
         self.assertEqual(content2.getvalue(), 'This is a test line.\n',
                          'Incorrect content returned by server.')
         self.assertEqual(resp2['date'], 'Tue, 01 Dec 2009 18:59:28 GMT',
+                         'Unexpected Content-Type from server.')
+        thread.join()
+    
+    def testGetChangedFromCache(self):
+        """Test a get request that changes after being cached"""
+        self.num_handled = 0
+        class TestRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+            test_object = self
+            
+            def do_GET(self):
+                if self.test_object.num_handled == 0:
+                    self.test_object.request_handler = self
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'text/html')
+                    self.send_header('Date', 'Tue, 01 Dec 2009 18:59:28 GMT')
+                    self.send_header('ETag', 'notreallyanetag')
+                    self.end_headers()
+                    self.wfile.write('This is a test line.\n')
+                    self.test_object.num_handled += 1
+                elif self.test_object.num_handled == 1:
+                    self.test_object.request_handler = self
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'text/html')
+                    self.send_header('Date', 'Tue, 01 Dec 2009 20:59:28 GMT')
+                    self.send_header('ETag', 'noreallyitsnotanetag')
+                    self.end_headers()
+                    self.wfile.write('This is NOT a test line.\n')
+                    self.test_object.num_handled += 1
+        
+        started = threading.Event()
+        def test_thread():
+            server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
+            started.set()
+            server.handle_request()
+            server.handle_request()
+            server.server_close()
+        
+        thread = threading.Thread(target=test_thread)
+        thread.start()
+        started.wait()
+        
+        self.fcurl.cache_dir = '.'
+        resp, content = self.fcurl.get_url('http://127.0.0.1:6110/index.html')
+        self.assertEqual(resp['status'], 200, 'Unexpected HTTP status.')
+        self.assertEqual(resp['content-type'], 'text/html',
+                         'Unexpected Content-Type from server.')
+        self.assertEqual(content.getvalue(), 'This is a test line.\n',
+                         'Incorrect content returned by server.')
+        self.assertEqual(self.request_handler.path, '/index.html',
+                         'Incorrect path on server.')
+        self.assertEqual(resp['date'], 'Tue, 01 Dec 2009 18:59:28 GMT',
+                         'Unexpected Content-Type from server.')
+        resp2, content2 = self.fcurl.get_url('http://127.0.0.1:6110/index.html')
+        self.assertEqual(resp2['status'], 200, 'Unexpected HTTP status.')
+        self.assertEqual(content2.getvalue(), 'This is NOT a test line.\n',
+                         'Incorrect content returned by server.')
+        self.assertEqual(resp2['date'], 'Tue, 01 Dec 2009 20:59:28 GMT',
                          'Unexpected Content-Type from server.')
         thread.join()
