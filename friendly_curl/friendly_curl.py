@@ -1,8 +1,15 @@
+from __future__ import with_statement
+
 __all__ = ['FriendlyCURL', 'threadCURLSingleton', 'url_parameters',
            'CurlHTTPConnection', 'CurlHTTPSConnection', 'CurlHTTPResponse',]
 
+import contextlib
 import logging
 import os
+import os.path
+import pickle
+import tempfile
+import shutil
 try:
     import threading as _threading
 except ImportError:
@@ -109,15 +116,64 @@ class FriendlyCURL(object):
         response['status'] = self.curl_handle.getinfo(pycurl.HTTP_CODE)
         return (response, body)
     
-    def get_url(self, url, headers = None, **kwargs):
+    def get_url(self, url, headers = None, use_cache = True, **kwargs):
         """Perform a regular HTTP GET using pycurl. See :meth:`_common_perform`
-        for details."""
+        for details.
+        
+        :param use_cache: Defaults to true, will use the cache if cache_dir is\
+        set. Pass false or unset cache_dir to ignore cache and not cache the\
+        result of the request."""
         headers = headers or {}
         self.curl_handle.setopt(pycurl.HTTPGET, 1)
-        return self._common_perform(url, headers, **kwargs)
+        cache_base_name = hash(url)
+        if not (use_cache and hasattr(self, '_cache_dir')):
+            return self._common_perform(url, headers, **kwargs)
+        
+        response_cache_filename = os.path.join(self.cache_dir,
+                                               '%s.response' % cache_base_name)
+        body_cache_filename = os.path.join(self.cache_dir,
+                                           '%s.body' % cache_base_name)
+        temp_buffer_fd, temp_buffer_path = tempfile.mkstemp()
+        try:
+            if 'body_buffer' in kwargs:
+                body_buffer = kwargs['body_buffer']
+                del kwargs['body_buffer']
+            else:
+                body_buffer = StringIO()
+            with os.fdopen(temp_buffer_fd, 'w') as temp_buffer:
+                cached_response = {}
+                if os.path.exists(response_cache_filename):
+                    with open(response_cache_filename, 'r') as response_cache:
+                        cached_response = pickle.load(response_cache)
+                if 'etag' in cached_response:
+                    # Retrieved before, do a conditional get.
+                    headers['If-None-Match'] = cached_response['etag']
+                    response, body = self._common_perform(
+                        url, headers, body_buffer=temp_buffer, **kwargs)
+                    if response['status'] == 304:
+                        with open(body_cache_filename, 'r') as cached_body:
+                            shutil.copyfileobj(cached_body, body_buffer)
+                        body_buffer.seek(0)
+                        return cached_response, body_buffer
+                else:
+                    # Retrieve the resource for the first time.
+                    response, body = self._common_perform(
+                        url, headers, body_buffer=temp_buffer, **kwargs)
+            with contextlib.nested(open(temp_buffer_path, 'r'),
+                                   open(body_cache_filename, 'w'),
+                                   open(response_cache_filename, 'w')) as\
+                 (temp_buffer, body_cache, response_cache):
+                pickle.dump(response, response_cache)
+                shutil.copyfileobj(temp_buffer, body_cache)
+                temp_buffer.seek(0)
+                shutil.copyfileobj(temp_buffer, body_buffer)
+                body_buffer.seek(0)
+            return response, body_buffer
+        finally:
+            os.unlink(temp_buffer_path)
     
     def head_url(self, url, headers = None, **kwargs):
-        """Performs an HTTP HEAD using pycurl. See :meth:`_common_perform`
+        """Performs an HTTP HEAD using pycurl. See :meth:_common_perform`
         for details."""
         headers = headers or {}
         self.curl_handle.setopt(pycurl.NOBODY, 1)
@@ -193,6 +249,18 @@ class FriendlyCURL(object):
             self.curl_handle.reset()
         else:
             self.curl_handle = pycurl.Curl()
+    
+    def cache_dir():
+        def fget(self):
+            return self._cache_dir
+        def fset(self, value):
+            self._cache_dir = os.path.abspath(value)
+        def fdel(self):
+            del self._cache_dir
+        doc = """Sets the directory to be used to store cache files. Whatever
+        value is provided will be run through os.path.abspath."""
+        return locals()
+    cache_dir = property(**cache_dir())
             
 local = _threading.local()
     
