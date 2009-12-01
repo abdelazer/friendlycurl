@@ -421,3 +421,58 @@ class TestFriendlyCURL(unittest.TestCase):
         self.assertEqual(self.second_request_handler.path, '/foo.html',
                          'Incorrect path on server.')
         thread.join()
+    
+    def testCachedGet(self):
+        """Test a basic get request"""
+        class TestRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+            test_object = self
+            
+            num_handled = 0
+            
+            def do_GET(self):
+                if self.num_handled == 0:
+                    self.test_object.request_handler = self
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'text/html')
+                    self.send_header('Date', 'Tue, 01 Dec 2009 18:59:28 GMT')
+                    self.send_header('ETag', 'notreallyanetag')
+                    self.end_headers()
+                    self.wfile.write('This is a test line.\n')
+                    self.num_handled += 1
+                elif self.num_handled == 1:
+                    self.test_object.request_handler = self
+                    self.send_response(304)
+                    self.send_header('ETag', 'notreallyanetag')
+                    self.end_headers()
+                    self.num_handled += 1
+        
+        started = threading.Event()
+        def test_thread():
+            server = BaseHTTPServer.HTTPServer(('', 6110), TestRequestHandler)
+            started.set()
+            server.handle_request()
+            server.handle_request()
+            server.server_close()
+        
+        thread = threading.Thread(target=test_thread)
+        thread.start()
+        started.wait()
+        
+        self.fcurl.cache_dir = '.'
+        resp, content = self.fcurl.get_url('http://127.0.0.1:6110/index.html')
+        self.assertEqual(resp['status'], 200, 'Unexpected HTTP status.')
+        self.assertEqual(resp['content-type'], 'text/html',
+                         'Unexpected Content-Type from server.')
+        self.assertEqual(content.getvalue(), 'This is a test line.\n',
+                         'Incorrect content returned by server.')
+        self.assertEqual(self.request_handler.path, '/index.html',
+                         'Incorrect path on server.')
+        self.assertEqual(resp['date'], 'Tue, 01 Dec 2009 18:59:28 GMT',
+                         'Unexpected Content-Type from server.')
+        resp2, content2 = self.fcurl.get_url('http://127.0.0.1:6110/index.html')
+        self.assertEqual(resp2['status'], 200, 'Unexpected HTTP status.')
+        self.assertEqual(content2.getvalue(), 'This is a test line.\n',
+                         'Incorrect content returned by server.')
+        self.assertEqual(resp2['date'], 'Tue, 01 Dec 2009 18:59:28 GMT',
+                         'Unexpected Content-Type from server.')
+        thread.join()
