@@ -1,10 +1,10 @@
 Metadata-Version: 1.0
 Name: friendly-curl
-Version: 0.8.4
+Version: 0.9dev-20091201
 Summary: A friendly interface to PyCURL.
 Home-page: UNKNOWN
 Author: Nick Pilon, Gavin Carothers
 Author-email: npilon@oreilly.com, gavin@oreilly.com
-License: UNKNOWN
+License: Apache 2
 Description: UNKNOWN
 Platform: UNKNOWN
