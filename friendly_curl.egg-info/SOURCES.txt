@@ -1,0 +1,16 @@
+setup.cfg
+setup.py
+friendly_curl/__init__.py
+friendly_curl/friendly_curl.py
+friendly_curl.egg-info/PKG-INFO
+friendly_curl.egg-info/SOURCES.txt
+friendly_curl.egg-info/dependency_links.txt
+friendly_curl.egg-info/entry_points.txt
+friendly_curl.egg-info/not-zip-safe
+friendly_curl.egg-info/paster_plugins.txt
+friendly_curl.egg-info/requires.txt
+friendly_curl.egg-info/top_level.txt
+friendly_curl/tests/__init__.py
+friendly_curl/tests/unit/__init__.py
+friendly_curl/tests/unit/test_curlhttpconnection.py
+friendly_curl/tests/unit/test_friendlycurl.py
