@@ -226,6 +226,7 @@ class FriendlyCURL(object):
         self.curl_handle.setopt(pycurl.READFUNCTION, upload_file.read)
         headers['Content-Type'] = content_type
         headers['Content-Length'] = upload_file_length
+        headers['Transfer-Encoding'] = ''
         result = self._common_perform(url, headers, **kwargs)
         self.reset()
         return result
