@@ -1,0 +1,14 @@
+syntax: glob
+*.pyc
+*~
+.svn
+build
+data
+dist
+*.swp
+*.db
+friendly_curl.egg-info
+.DS_Store
+*.log
+*.wpr
+friendly_curl/docs/_*
