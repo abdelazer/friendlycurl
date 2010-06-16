@@ -51,9 +51,11 @@ def debugfunction(curl_info, data):
     elif curl_info == pycurl.INFOTYPE_HEADER_OUT:
         log.debug("Header Sent to Peer: %r", data)
     elif curl_info == pycurl.INFOTYPE_DATA_IN:
-        log.debug("Data From Peer: %r", data)
+        #log.debug("Data From Peer: %r", data)
+        pass
     elif curl_info == pycurl.INFOTYPE_DATA_OUT:
-        log.debug("Data To Peer: %r", data)
+        #log.debug("Data To Peer: %r", data)
+        pass
     return 0
 
 class FriendlyCURL(object):
@@ -98,6 +100,7 @@ class FriendlyCURL(object):
             body = body_buffer
         else:
             body = StringIO()
+        self.curl_handle.setopt(pycurl.FORBID_REUSE, 1)
         self.curl_handle.setopt(pycurl.WRITEFUNCTION, body.write)
         header = StringIO()
         self.curl_handle.setopt(pycurl.HEADERFUNCTION, header.write)
@@ -127,7 +130,11 @@ class FriendlyCURL(object):
         self.curl_handle.setopt(pycurl.HTTPGET, 1)
         cache_base_name = hash(url)
         if not (use_cache and hasattr(self, '_cache_dir')):
-            return self._common_perform(url, headers, **kwargs)
+            try:
+                result = self._common_perform(url, headers, **kwargs)
+            finally:
+                self.reset()
+            return result
         
         response_cache_filename = os.path.join(self.cache_dir,
                                                '%s.response' % cache_base_name)
@@ -177,8 +184,10 @@ class FriendlyCURL(object):
         for details."""
         headers = headers or {}
         self.curl_handle.setopt(pycurl.NOBODY, 1)
-        result = self._common_perform(url, headers, **kwargs)
-        self.reset()
+        try:
+            result = self._common_perform(url, headers, **kwargs)
+        finally:
+            self.reset()
         return result
     
     def post_url(self, url, data=None, upload_file=None, upload_file_length=None,
@@ -207,8 +216,10 @@ class FriendlyCURL(object):
         self.curl_handle.setopt(pycurl.READFUNCTION, upload_file.read)
         headers['Content-Type'] = content_type
         headers['Content-Length'] = upload_file_length
-        result = self._common_perform(url, headers, **kwargs)
-        self.reset()
+        try:
+            result = self._common_perform(url, headers, **kwargs)
+        finally:
+            self.reset()
         return result
         
     def put_url(self, url, data=None, upload_file=None, upload_file_length=None,
@@ -227,8 +238,10 @@ class FriendlyCURL(object):
         headers['Content-Type'] = content_type
         headers['Content-Length'] = upload_file_length
         headers['Transfer-Encoding'] = ''
-        result = self._common_perform(url, headers, **kwargs)
-        self.reset()
+        try:
+            result = self._common_perform(url, headers, **kwargs)
+        finally:
+            self.reset()
         return result
     
     def delete_url(self, url, headers = None, **kwargs):
@@ -236,8 +249,10 @@ class FriendlyCURL(object):
         further details."""
         headers = headers or {}
         self.curl_handle.setopt(pycurl.CUSTOMREQUEST, 'DELETE')
-        result = self._common_perform(url, headers, **kwargs)
-        self.reset()
+        try:
+            result = self._common_perform(url, headers, **kwargs)
+        finally:
+            self.reset()
         return result
     
     def reset(self):
