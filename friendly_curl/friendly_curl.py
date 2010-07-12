@@ -331,6 +331,14 @@ class CurlHTTPConnection(object):
                 headers['Content-Length'] = len(body)
                 body_IO = StringIO(body)
                 handle.setopt(pycurl.READFUNCTION, body_IO.read)
+        elif method == 'PATCH':
+            handle.setopt(pycurl.UPLOAD, 1)
+            handle.setopt(pycurl.CUSTOMREQUEST, 'PATCH')
+            if body:
+                headers['Transfer-Encoding'] = ''
+                headers['Content-Length'] = len(body)
+                body_IO = StringIO(body)
+                handle.setopt(pycurl.READFUNCTION, body_IO.read)
         elif body is not None:
             # Custom method and body provided, error.
             raise Exception("body not supported with custom method %s." % method)
