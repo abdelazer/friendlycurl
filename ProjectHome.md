@@ -1,0 +1,1 @@
+Friendly wrapper for a PyCURL
